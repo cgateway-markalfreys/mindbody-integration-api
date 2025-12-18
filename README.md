@@ -1,33 +1,51 @@
 # Cayman Mindbody Integration
 
-Production-ready Node.js, Express, and TypeScript service that bridges Cayman Gateway payments with Mindbody transactions. It accepts hosted checkout webhooks, normalizes payloads, posts Mindbody sales, and offers helper utilities for generating signed storefront links.
+Production-ready Node.js, Express, and TypeScript service that bridges Cayman Gateway payments with Mindbody transactions. Manages checkout sessions, webhooks, staff payments, and admin credentials for seamless integration between Cayman and Mindbody.
 
 ## Features
 
-- Normalize Cayman Gateway webhook payloads and record Mindbody sales with Cayman transaction metadata.
-- Provide `/store`, `/paylinks`, and `/staff` route groups for hosted checkout, buy-now links, and staff-assisted payments.
-- Persist Cayman credentials and configuration in MySQL via an admin endpoint protected by `ADMIN_SECRET`.
-- Run smoke tests against Mindbody’s sandbox with `MBO_CHECKOUT_TEST` safeguards.
+- Multi-tenant support via `tenants.json` configuration.
+- Hosted checkout flow: create sessions, handle returns, store signed tokens.
+- Staff-assisted payment UI: list clients, process payments, retrieve receipts.
+- Paylinks API: generate signed checkout links for external integrations.
+- Webhook handlers: normalize Cayman payments and post to Mindbody automatically.
+- Admin UI: manage Cayman API credentials and Mindbody source info in MySQL.
+- Health checks and flexible authentication (Mindbody source credentials or pre-issued tokens).
 
 ## Prerequisites
 
 - Node.js 20+
-- MySQL 8+ instance
-- Mindbody sandbox credentials (site ID, API key, source name, source password, optional pre-issued user token)
-- Cayman Gateway API credentials (base URL, API key, username, password, webhook secret)
+- MySQL 8+ instance (to persist Cayman API credentials)
+- Mindbody sandbox account (site ID, API key, source credentials or user token)
+- Cayman Gateway sandbox account (API key, username, password, webhook secret)
+- (Optional) a `tenants.json` file to configure multiple Mindbody sites
 
 ## Getting Started
 
 1. Install dependencies:
-  ```powershell
-  npm install
-  ```
-2. Copy `.env.example` to `.env` and fill in Mindbody identifiers (site, service Id, optional pre-issued user token), Cayman Gateway webhook secret, and database connection details. Provide unique values for `ADMIN_SECRET`, `ADMIN_WRITE_SECRET`, `STAFF_SECRET`, and `LINK_SIGNING_SECRET`. If you prefer discrete MySQL fields, remove `DATABASE_URL` and supply `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, and `MYSQL_DATABASE` instead.
-3. Initialize MySQL schema and seed row:
-  ```powershell
-  mysql -u <user> -p <database> < schema.sql
-  ```
-  This script creates the `api_configs` table and inserts a placeholder config that the admin UI will overwrite once you save credentials.
+   ```powershell
+   npm install
+   ```
+
+2. Copy `.env.example` to `.env` and update values:
+   - **Database**: `DATABASE_URL` (or individual `MYSQL_*` fields)
+   - **Secrets**: `ADMIN_SECRET`, `ADMIN_WRITE_SECRET`, `STAFF_SECRET`, `LINK_SIGNING_SECRET`
+   - **Cayman**: `CAYMAN_WEBHOOK_SECRET`
+   - **Mindbody**: `MINDBODY_SITE_ID`, `MINDBODY_USER_TOKEN` (or source credentials via admin UI)
+   - **URLs**: `PUBLIC_BASE_URL`, `STAFF_FRONTEND_BASE_URL`
+
+3. Initialize the database:
+   ```powershell
+   mysql -u <user> -p <database> < schema.sql
+   ```
+   Creates `api_configs` table for storing Cayman API credentials.
+
+4. (Optional) Create or update `tenants.json` to configure multiple Mindbody sites.
+
+5. Start the server:
+   ```powershell
+   npm run dev
+   ```
 
 ## Scripts
 
@@ -42,12 +60,47 @@ Production-ready Node.js, Express, and TypeScript service that bridges Cayman Ga
 
 The service listens on `PORT` (default `4000`). Hit `GET /` for a basic health check.
 
+## API Endpoints
+
+### Health & Status
+- `GET /` – Health check
+- `GET /health/mindbody` – Mindbody API status
+- `GET /thanks` – Success page (redirect after payment)
+- `GET /cancel` – Cancellation page (redirect if payment fails)
+
+### Store Endpoints
+- `GET /store/products` – List available products
+
+### Checkout Flow
+- `POST /v1/checkout/sessions` or `POST /checkout/sessions` – Create a checkout session
+- `GET /v1/checkout/return` or `GET /checkout/return` – Handle checkout completion
+
+### Paylinks API
+- `POST /api/paylinks` – Generate a signed checkout link for external use
+
+### Staff Payments
+- `GET /staff/pay` – Staff payment form (requires `STAFF_SECRET`)
+- `POST /staff/pay` – Process staff payment
+- `GET /staff/clients` – List clients for staff UI
+- `GET /staff/receipt` – Retrieve payment receipt
+
+### Webhooks
+- `POST /webhook/cayman` – Handle Cayman Gateway webhooks
+- `POST /webhooks/cayman` – Alternative Cayman webhook endpoint
+
+### Cayman API Proxy
+- `POST /cayman/three-step` – Proxy Cayman three-step API calls
+
+### Admin Configuration
+- `GET /admin/config` – View Cayman credentials (requires `ADMIN_SECRET`)
+- `POST /admin/config` – Save/update credentials (requires `ADMIN_WRITE_SECRET`)
+
 ## Store Checkout Flow
 
-1. Provision `.env` with Cayman + Mindbody credentials and a long `HMAC_SECRET` value.
+1. Provision `.env` with Cayman + Mindbody credentials and required secrets.
 2. Start the API: `npm run dev`.
-3. Generate a signed buy-now link with the link builder script.
-4. Trigger the checkout via the hosted script snippet shown below or by calling `/v1/checkout/sessions` directly.
+3. Generate a signed buy-now link using the link builder script or by calling `POST /api/paylinks`.
+4. Trigger the checkout via the hosted script snippet or by calling `/v1/checkout/sessions` directly.
 5. Keep `MBO_CHECKOUT_TEST=true` until you are ready to create visible Mindbody receipts, then switch to `false`.
 
 ## Webhook Flow
@@ -55,8 +108,6 @@ The service listens on `PORT` (default `4000`). Hit `GET /` for a basic health c
 1. Receive Cayman Gateway webhook `POST /webhook/cayman` containing `{ email, firstName, lastName, amount, ... }`.
 2. Create or update the Mindbody client via `client/addclient`.
 3. Call `sale/checkoutshoppingcart` to post the sale using Cayman transaction metadata.
-
-> Update the sample cart items in `src/controllers/caymanWebhookController.ts` to match the SKUs configured in your Mindbody environment.
 
 ## Mindbody Service Configuration
 
