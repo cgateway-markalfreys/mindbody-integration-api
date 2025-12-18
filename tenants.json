@@ -1,0 +1,11 @@
+[
+  {
+    "siteId": "-99",
+    "label": "Sandbox",
+    "mbApiKey": "mb_key_for_minus99",
+    "staffUser": "sandbox.staff",
+    "staffPass": "sandbox.pass",
+    "customTenderId": 25,
+    "currency": "USD"
+  }
+]
