@@ -22,7 +22,7 @@ Production-ready Node.js, Express, and TypeScript service that bridges Cayman Ga
   ```powershell
   npm install
   ```
-2. Copy `env.local.example` to `.env` (or start from `.env.example` if you prefer a minimal template) and fill in Mindbody identifiers (site, service Id, API key, source credentials or user token), Cayman Gateway credentials, and database access. You can supply either a unified `DATABASE_URL` (for example `mysql://user:pass@host:3306/dbname`) or discrete connection fields (`MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`). Set distinct secrets for `ADMIN_SECRET`, `ADMIN_WRITE_SECRET`, `STAFF_SECRET`, plus a unique `LINK_SIGNING_SECRET`.
+2. Copy `.env.example` to `.env` and fill in Mindbody identifiers (site, service Id, optional pre-issued user token), Cayman Gateway webhook secret, and database connection details. Provide unique values for `ADMIN_SECRET`, `ADMIN_WRITE_SECRET`, `STAFF_SECRET`, and `LINK_SIGNING_SECRET`. If you prefer discrete MySQL fields, remove `DATABASE_URL` and supply `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, and `MYSQL_DATABASE` instead.
 3. Initialize MySQL schema and seed row:
   ```powershell
   mysql -u <user> -p <database> < schema.sql
@@ -81,73 +81,66 @@ The service listens on `PORT` (default `4000`). Hit `GET /` for a basic health c
 ### Environment Variables (exact names)
 
 ```dotenv
-# --- Admin authentication secrets ---
-ADMIN_SECRET=replace-with-long-random-string
-ADMIN_WRITE_SECRET=replace-with-long-random-string
-STAFF_SECRET=replace-with-long-random-string
+# Example environment variables for the Cayman Gateway Mindbody Integration
 
-# --- Public URLs ---
-PUBLIC_BASE_URL=http://localhost:4000
-APP_BASE_URL=http://localhost:4000
-STAFF_FRONTEND_BASE_URL=https://your-staff-frontend.example.com
+#Admin Secrets added on admin/config?secret=
+ADMIN_SECRET=some-long-random-string-here-admin-front
 
-# --- Cayman Gateway API ---
+#Used to authenticate in admin/config page for write operations
+ADMIN_WRITE_SECRET=some-long-random-string-here-admin-password
+
+#Do not change this
 CAYMAN_API_BASE_URL=https://apidev.caymangateway.com/apiv3
-CAYMAN_API_KEY=replace-with-cayman-api-key
-CAYMAN_API_USERNAME=replace-with-cayman-username
-CAYMAN_API_PASSWORD=replace-with-cayman-password
+
+#Change this to your own secret
 CAYMAN_WEBHOOK_SECRET=replace-with-cayman-webhook-secret
 
-# --- Mindbody API ---
-MINDBODY_BASE_URL=https://api.mindbodyonline.com/public/v6
-MINDBODY_SITE_ID=-99
-MINDBODY_SERVICE_ID=
-MINDBODY_API_KEY=replace-with-mindbody-api-key
-MINDBODY_SOURCE_NAME=_YourMindbodySourceName
-MINDBODY_SOURCE_PASSWORD=replace-with-mindbody-source-password
-MINDBODY_USER_TOKEN=
-MINDBODY_CAYMAN_PAYMENT_METHOD_ID=25
-
-# --- Database configuration ---
+#Change this to your own database connection string
 DATABASE_URL=mysql://user:pass@host:3306/dbname
-# MYSQL_HOST=localhost
-# MYSQL_PORT=3306
-# MYSQL_USER=root
-# MYSQL_PASSWORD=
-# MYSQL_DATABASE=cg_integration
-# MYSQL_POOL_SIZE=10
 
-# --- Signing + feature flags ---
+#Change this to your own secret
 LINK_SIGNING_SECRET=replace-with-signing-secret
-MBO_CHECKOUT_TEST=true
-PM_CONFIG_PRODUCTION=false
-PORT=4000
+
+#Set to true to use Mindbody test environment
+MBO_CHECKOUT_TEST=false
+
+#DO NOT CHANGE THIS URL
+MINDBODY_BASE_URL=https://api.mindbodyonline.com/public/v6
+
+#Change these to your own Mindbody Site ID
+MINDBODY_SITE_ID=-99
+
+#You can leave this as is (or provide a pre-issued user token)
+MINDBODY_USER_TOKEN=
+
+#Node environment settings
 NODE_ENV=development
 
-# --- Optional Cayman defaults for hosted checkout receipts ---
-# CAYMAN_DEFAULT_STREET1=1 Demo Way
-# CAYMAN_DEFAULT_STREET2=
-# CAYMAN_DEFAULT_CITY=George Town
-# CAYMAN_DEFAULT_STATE=
-# CAYMAN_DEFAULT_ZIP=KY1-1201
-# CAYMAN_DEFAULT_COUNTRY=KY
-# CAYMAN_DEFAULT_PHONE=
-# CAYMAN_DEFAULT_CURRENCY=USD
+#Set to true for production
+PM_CONFIG_PRODUCTION=false
 
-# --- Optional credential management settings ---
-# API_CONFIG_SITE_KEY=default
-# API_CONFIG_REFRESH_INTERVAL_MS=30000
+#Port to run the server on
+PORT=4000
 
-# --- Tenants file override (defaults to ./tenants.json) ---
-# TENANTS_PATH=./tenants.json
+#BACKEND URL HERE
+PUBLIC_BASE_URL=https://cg-mindybody-integration-2.onrender.com
+
+#FRONTEND URL HERE
+STAFF_FRONTEND_BASE_URL=https://cg-mindybody-integration-front.vercel.app
+
+#Change this to your own secret
+STAFF_SECRET=replace-with-staff-secret
+
+#Change these to your own Mindbody credentials
+MINDBODY_CAYMAN_PAYMENT_METHOD_ID=25
 ```
 
 **Notes**
 
-- Mindbody requires an underscore prefix in `MINDBODY_SOURCE_NAME`; fetch the account’s service catalog with `/sale/services` to identify the `MINDBODY_SERVICE_ID` you intend to sell.
-- Retrieve a custom payment method Id for `MINDBODY_CAYMAN_PAYMENT_METHOD_ID` via `GET /sale/custompaymentmethods` using your Mindbody API key and source credentials.
-- `DATABASE_URL` can be replaced with individual `MYSQL_*` variables when you prefer discrete connection values.
-- Leave `MINDBODY_USER_TOKEN` blank to let the service mint one using the source credentials; supply a value only when you manage tokens externally.
+- Mindbody payment method Ids can be queried via `GET /sale/custompaymentmethods` (API key + source credentials required); replace `MINDBODY_CAYMAN_PAYMENT_METHOD_ID` with the Id you plan to use.
+- If you want the service to mint Mindbody tokens automatically, leave `MINDBODY_USER_TOKEN` empty and configure source credentials in the admin UI.
+- Populate `DATABASE_URL` with your connection string or swap in individual `MYSQL_*` variables if you prefer discrete fields.
+- Cayman API key, username, and password values are persisted through the admin UI (`/admin/config`); they do not live in the default `.env` template.
 
 ### Merchant Embed Snippet
 
